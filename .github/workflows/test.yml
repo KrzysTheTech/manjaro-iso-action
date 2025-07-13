@@ -1,69 +1,71 @@
 name: 'build-test'
+
 on:
   pull_request:
   workflow_dispatch:
-    # You can define inputs here if your workflow requires any parameters
-    # For example:
-    # inputs:
-    #   logLevel:
-    #     description: 'Log level'
-    #     required: true
-    #     default: 'warning'
-
-
-env:
-  ##### EDIT ME #####
-  iso-profiles-git: https://gitlab.manjaro.org/profiles-and-settings/iso-profiles
-  version: ci-test-ignore-me-${{ github.event.number }}
-  ###################
 
 jobs:
+  set-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.setver.outputs.version }}
+    steps:
+      - name: Set version tag based on date
+        id: setver
+        run: |
+          yy=$(date +'%y')
+          mm=$(date +'%m')
+          yymmdd=$(date +'%y%m%d')
+          version="${yy}.${mm}-${yymmdd}"
+          echo "version=$version" >> $GITHUB_OUTPUT
+
   cleanup:
     runs-on: ubuntu-latest
+    needs: set-version
+    env:
+      version: ${{ needs.set-version.outputs.version }}
     steps:
-      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
-      - name: delete test-release
+      - uses: actions/checkout@v4
+      - name: Delete test release if exists
         run: |
-          echo ${{ github.token }} | gh auth login --with-token
-          gh release delete ${{ env.version }} -y --repo ${{ github.repository }} || exit 0
-          git push --delete origin ${{ env.version }}
+          echo "${{ github.token }}" | gh auth login --with-token
+          gh release delete "${{ env.version }}" -y --repo "${{ github.repository }}" || true
+          git push --delete origin "${{ env.version }}" || true
+
   build-release:
     runs-on: ubuntu-22.04
-    needs: [cleanup]
+    needs: [cleanup, set-version]
+    env:
+      version: ${{ needs.set-version.outputs.version }}
     strategy:
       matrix:
-        ##### EDIT ME #####
-        EDITION: [kde]
-        BRANCH: [unstable]
-        SCOPE: [full]
-        ###################
+        edition: [kde]
+        branch: [unstable]
+        scope: [full]
     steps:
-      - uses: styfle/cancel-workflow-action@85880fa0301c86cca9da44039ee3bb12d3bedbfa # 0.12.1
+      - uses: styfle/cancel-workflow-action@0.12.1
         with:
           access_token: ${{ github.token }}
-      - uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4
+
+      - uses: actions/checkout@v4
+
       - id: image-build
         uses: ./
         with:
-          iso-profiles-repo: ${{ env.iso-profiles-git }}
+          iso-profiles-repo: https://gitlab.manjaro.org/profiles-and-settings/iso-profiles
           edition: ${{ matrix.edition }}
           branch: ${{ matrix.branch }}
           scope: ${{ matrix.scope }}
           version: ${{ env.version }}
           release-tag: ${{ env.version }}
           kernel: linux616
-          gpg-secret-key-base64: ${{ secrets.gpg_secret_base64 }}
-          gpg-passphrase: 1234
+          gpg-secret-key-base64: ${{ secrets.GPG_SECRET_BASE64 }}
+          gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
           cdn77-host: ${{ secrets.CDN_HOST }}
           cdn77-user: ${{ secrets.CDN_USER }}
           cdn77-pwd: ${{ secrets.CDN_PWD }}
           sf-project: manjarolinux
           sf-user: ${{ secrets.SF_USER_NAME }}
           sf-key: ${{ secrets.SF_PRIV_SSHKEY }}
-          # custom-repo: 
           office-chooser: true
           build-mirror: ${{ secrets.BUILD_MIRROR }}
-          # osdn is absurdly slow sometimes
-          # osdn-project: manjaro
-          # osdn-user: ${{ secrets.OSDN_USER_NAME }}
-          # osdn-key: ${{ secrets.OSDN_PRIV_SSHKEY }}
