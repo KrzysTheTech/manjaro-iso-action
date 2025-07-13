@@ -24,9 +24,9 @@ jobs:
     strategy:
       matrix:
         ##### EDIT ME #####
-        EDITION: [xfce]
-        BRANCH: [stable]
-        SCOPE: [minimal]
+        EDITION: [kde]
+        BRANCH: [unstable]
+        SCOPE: [full]
         ###################
     steps:
       - uses: styfle/cancel-workflow-action@85880fa0301c86cca9da44039ee3bb12d3bedbfa # 0.12.1
@@ -42,6 +42,7 @@ jobs:
           scope: ${{ matrix.scope }}
           version: ${{ env.version }}
           release-tag: ${{ env.version }}
+          kernel: linux616
           gpg-secret-key-base64: ${{ secrets.gpg_secret_base64 }}
           gpg-passphrase: 1234
           cdn77-host: ${{ secrets.CDN_HOST }}
